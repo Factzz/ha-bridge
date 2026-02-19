@@ -1,0 +1,157 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+    .ha-container { 
+        font-family: 'Inter', sans-serif !important; 
+        text-align: left; 
+        color: #333;
+    }
+    .ha-header {
+        display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
+        background: linear-gradient(135deg, #03A9F4 0%, #0288D1 100%);
+        padding: 20px; border-radius: 18px; color: white;
+        box-shadow: 0 5px 15px rgba(3, 169, 244, 0.3);
+    }
+    .ha-icon { font-size: 2.5rem; }
+    .ha-title h2 { margin: 0; font-size: 1.2rem; font-weight: 700; }
+    .ha-title p { margin: 0; font-size: 0.85rem; opacity: 0.9; }
+
+    .ip-badge {
+        background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin-top: 5px; display: inline-block;
+    }
+
+    .code-block {
+        background: #2b2b2b; color: #a9b7c6; 
+        padding: 15px; border-radius: 12px;
+        font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+        overflow-x: auto; white-space: pre; margin-bottom: 15px;
+        border: 1px solid #444; position: relative;
+    }
+    
+    .section-head { font-weight: 700; margin-top: 20px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; color: #0288D1; }
+    
+    .btn-copy {
+        position: absolute; top: 10px; right: 10px;
+        background: rgba(255,255,255,0.1); color: white;
+        border: 1px solid rgba(255,255,255,0.2);
+        padding: 5px 10px; border-radius: 6px; cursor: pointer;
+        font-size: 0.7rem; transition: 0.2s;
+    }
+    .btn-copy:active { background: #4CAF50; border-color: #4CAF50; }
+
+    .step-box {
+        background: white; padding: 15px; border-radius: 12px;
+        border: 1px solid #eee; margin-bottom: 10px; font-size: 0.9rem;
+    }
+    .step-num {
+        display: inline-flex; width: 24px; height: 24px; background: #0288D1; color: white;
+        border-radius: 50%; justify-content: center; align-items: center; font-weight: bold; font-size: 0.8rem; margin-right: 8px;
+    }
+</style>
+
+<div class="glass-card ha-container">
+    <div class="ha-header">
+        <i class="fa-solid fa-house-signal ha-icon"></i>
+        <div class="ha-title">
+            <h2>Home Assistant Bridge</h2>
+            <p>เชื่อมต่อ Rosemary เข้ากับ Smart Home</p>
+            <div id="device-ip" class="ip-badge">Detecting IP...</div>
+        </div>
+    </div>
+
+    <div class="step-box">
+        <div style="margin-bottom: 5px;"><strong><span class="step-num">1</span> เลือกวิธีเชื่อมต่อ</strong></div>
+        <div style="color:#666; font-size:0.85rem;">ระบบจะสร้าง Code สำหรับ configuration.yaml ให้โดยอัตโนมัติตาม IP ของเครื่องนี้</div>
+    </div>
+
+    <div class="section-head"><i class="fa-solid fa-code"></i> YAML Configuration</div>
+    <div class="code-block">
+        <button class="btn-copy" onclick="window.HABridge.copyCode()">COPY</button>
+        <code id="yaml-code">Generating...</code>
+    </div>
+
+    <div class="step-box">
+        <div style="margin-bottom: 5px;"><strong><span class="step-num">2</span> การติดตั้ง</strong></div>
+        <ul style="margin: 0; padding-left: 25px; color:#555; font-size:0.85rem;">
+            <li>ก๊อปปี้โค้ดด้านบน</li>
+            <li>เปิดไฟล์ <code>configuration.yaml</code> ใน Home Assistant</li>
+            <li>วางโค้ดลงไป (ระวังการเว้นวรรค)</li>
+            <li>กด Restart Home Assistant</li>
+        </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; color: #888; font-size: 0.8rem;">
+        <i class="fa-solid fa-circle-check" style="color: #4CAF50;"></i> รองรับ Auto-Discovery (Future Update)
+    </div>
+</div>
+
+<script type="module">
+    import { RosemarySDK } from './js/sdk.js';
+
+    window.HABridge = {
+        async init() {
+            try {
+                // ดึงข้อมูลจริงจากบอร์ดเพื่อเอา IP
+                const sysInfo = await RosemarySDK.getSystemInfo();
+                const ip = sysInfo.ip || "192.168.x.x";
+                
+                document.getElementById('device-ip').innerText = "IP: " + ip;
+                this.generateYaml(ip);
+            } catch(e) {
+                document.getElementById('device-ip').innerText = "Connection Failed";
+                this.generateYaml("REPLACE_WITH_IP");
+            }
+        },
+
+        generateYaml(ip) {
+            const yaml = `
+# Rosemary OS Integration
+rest:
+  - resource: http://${ip}/api/data
+    scan_interval: 10
+    sensor:
+      - name: "Rosemary Moisture Zone 1"
+        value_template: "{{ value_json.plants[0].moisture }}"
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+      - name: "Rosemary Temp"
+        value_template: "{{ value_json.env.temp }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+      - name: "Rosemary VPD"
+        value_template: "{{ value_json.env.vpd }}"
+        unit_of_measurement: "kPa"
+
+rest_command:
+  rosemary_water_z1:
+    url: "http://${ip}/api/water"
+    method: POST
+    payload: '{"index": 0}'
+    content_type:  'application/json'
+  rosemary_water_z2:
+    url: "http://${ip}/api/water"
+    method: POST
+    payload: '{"index": 1}'
+    content_type:  'application/json'
+            `.trim();
+            document.getElementById('yaml-code').innerText = yaml;
+        },
+
+        copyCode() {
+            const code = document.getElementById('yaml-code').innerText;
+            navigator.clipboard.writeText(code);
+            const btn = document.querySelector('.btn-copy');
+            btn.innerText = "COPIED!";
+            btn.style.background = "#4CAF50";
+            setTimeout(() => {
+                btn.innerText = "COPY";
+                btn.style.background = "rgba(255,255,255,0.1)";
+            }, 2000);
+        }
+    };
+
+    window.HABridge.init();
+</script>
